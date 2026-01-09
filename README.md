@@ -1,25 +1,25 @@
 # File Storage Service
 
-Независимый сервис файлового хранилища на основе MinIO и PostgreSQL с контролем доступа, квотами и поддержкой bulk-операций.
+Independent file storage service based on MinIO and PostgreSQL with access control, quotas, and bulk operations support.
 
-## Обзор
+## Overview
 
-Полнофункциональный сервис для управления файлами с контролем доступа на основе ролей, ограничениями по размеру хранилища и поддержкой массовых операций.
+Full-featured service for file management with role-based access control, storage size limits, and bulk operations support.
 
-### Основные возможности
+### Key Features
 
-- Загрузка файлов с валидацией размера и типа
-- Скачивание файлов с контролем доступа
-- Генерация presigned URLs для прямого доступа к файлам
-- Удаление файлов с проверкой прав
-- Массовая загрузка файлов (bulk upload)
-- Пагинация списка файлов проекта
-- Контроль квот хранилища на уровне проекта
-- Определение MIME-типов файлов (Apache Tika)
-- Классификация файлов по типам
-- Блокировка опасных расширений файлов
+- File upload with size and type validation
+- File download with access control
+- Presigned URL generation for direct file access
+- File deletion with permission checks
+- Bulk file upload
+- Project file list pagination
+- Project-level storage quota control
+- MIME type detection (Apache Tika)
+- File type classification
+- Blocked file extensions
 
-## Архитектура
+## Architecture
 
 ```
 ┌─────────────────┐
@@ -39,80 +39,80 @@
 └────────┘  └──────────┘
 ```
 
-### Слои приложения
+### Application Layers
 
-1. **Controller Layer** - обработка HTTP запросов, валидация, формирование ответов
-2. **Service Layer** - бизнес-логика, контроль доступа, управление квотами
-3. **Repository Layer** - абстракция доступа к данным
-4. **Storage Layer** - MinIO для файлов, PostgreSQL для метаданных
+1. **Controller Layer** - HTTP request handling, validation, response formation
+2. **Service Layer** - business logic, access control, quota management
+3. **Repository Layer** - data access abstraction
+4. **Storage Layer** - MinIO for files, PostgreSQL for metadata
 
-Подробнее: [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+For more details: [ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-## Технологии
+## Technologies
 
 - **Java 17** + **Spring Boot 3.0.6**
-- **PostgreSQL** - метаданные и транзакции
-- **MinIO** - S3-совместимое объектное хранилище
-- **Apache Tika** - определение MIME-типов по содержимому
-- **Liquibase** - управление миграциями БД
+- **PostgreSQL** - metadata and transactions
+- **MinIO** - S3-compatible object storage
+- **Apache Tika** - MIME type detection by content
+- **Liquibase** - database migration management
 
-### Ключевые архитектурные решения
+### Key Architectural Decisions
 
-**MinIO** - S3-совместимое API, простота развертывания, self-hosted решение  
-**Apache Tika** - точное определение MIME-типов по содержимому, защита от подмены расширений  
-**PostgreSQL** - ACID гарантии, эффективные индексы, pessimistic locking для квот  
-**Pessimistic Locking** - предотвращение race conditions при параллельных загрузках
+**MinIO** - S3-compatible API, simple deployment, self-hosted solution  
+**Apache Tika** - accurate MIME type detection by content, protection against extension spoofing  
+**PostgreSQL** - ACID guarantees, efficient indexes, pessimistic locking for quotas  
+**Pessimistic Locking** - prevents race conditions during parallel uploads
 
-Подробнее: [ARCHITECTURE.md](docs/ARCHITECTURE.md)
+For more details: [ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-## Быстрый старт
+## Quick Start
 
-### Docker Compose (рекомендуется)
+### Docker Compose (recommended)
 
 ```bash
-# Запуск PostgreSQL и MinIO
+# Start PostgreSQL and MinIO
 docker-compose up -d
 
-# Проверка статуса
+# Check status
 docker-compose ps
 ```
 
-После запуска:
+After startup:
 - **PostgreSQL**: `localhost:5432` (user: `postgres`, password: `postgres`)
 - **MinIO API**: `http://localhost:9000`
 - **MinIO Console**: `http://localhost:9001` (user: `minioadmin`, password: `minioadmin`)
 
-### Запуск приложения
+### Running the Application
 
 ```bash
-# С использованием Gradle
+# Using Gradle
 ./gradlew bootRun
 
-# Или соберите JAR
+# Or build JAR
 ./gradlew build
 java -jar build/libs/filestorage-service.jar
 ```
 
-Приложение будет доступно на `http://localhost:8080`
+The application will be available at `http://localhost:8080`
 
-Подробнее: [DEPLOYMENT.md](docs/DEPLOYMENT.md)
+For more details: [DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ## API Endpoints
 
-| Метод | Endpoint | Описание |
-|-------|----------|----------|
-| POST | `/api/v1/projects/{projectId}/resources` | Загрузка файла |
-| GET | `/api/v1/projects/{projectId}/resources/{resourceId}/download` | Скачивание файла |
-| GET | `/api/v1/projects/{projectId}/resources/{resourceId}/url` | Получение presigned URL |
-| DELETE | `/api/v1/projects/{projectId}/resources/{resourceId}` | Удаление файла |
-| GET | `/api/v1/projects/{projectId}/resources` | Список файлов (с пагинацией) |
-| POST | `/api/v1/projects/{projectId}/resources/bulk` | Массовая загрузка |
+| Method | Endpoint | Description |
+|-------|----------|-------------|
+| POST | `/api/v1/projects/{projectId}/resources` | Upload file |
+| GET | `/api/v1/projects/{projectId}/resources/{resourceId}/download` | Download file |
+| GET | `/api/v1/projects/{projectId}/resources/{resourceId}/url` | Get presigned URL |
+| DELETE | `/api/v1/projects/{projectId}/resources/{resourceId}` | Delete file |
+| GET | `/api/v1/projects/{projectId}/resources` | List files (with pagination) |
+| POST | `/api/v1/projects/{projectId}/resources/bulk` | Bulk upload |
 
-### Обязательные заголовки
+### Required Headers
 
-Все запросы требуют заголовок: `x-user-id: {userId}`
+All requests require header: `x-user-id: {userId}`
 
-### Пример загрузки
+### Upload Example
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/projects/1/resources \
@@ -121,26 +121,26 @@ curl -X POST http://localhost:8080/api/v1/projects/1/resources \
   -F "allowedRoles=MANAGER,DEVELOPER"
 ```
 
-## Безопасность
+## Security
 
-### Ролевая модель доступа
+### Role-Based Access Model
 
-- Файлы могут быть ограничены определенными ролями при загрузке
-- Проверка доступа при скачивании (членство в проекте + роль)
-- Удаление доступно только создателю файла или менеджеру проекта
+- Files can be restricted to specific roles during upload
+- Access check on download (project membership + role)
+- Deletion available only to file creator or project manager
 
-### Валидация файлов
+### File Validation
 
-- Максимальный размер: 500MB (настраивается)
-- Блокировка расширений: `exe`, `bat`, `cmd`, `sh`
-- Определение MIME-типа через Apache Tika (анализ содержимого)
-- Санитизация имен файлов
+- Maximum size: 500MB (configurable)
+- Blocked extensions: `exe`, `bat`, `cmd`, `sh`
+- MIME type detection via Apache Tika (content analysis)
+- File name sanitization
 
-Подробнее: [SECURITY.md](docs/SECURITY.md)
+For more details: [SECURITY.md](docs/SECURITY.md)
 
-## Конфигурация
+## Configuration
 
-Основные настройки в `application.yaml`:
+Main settings in `application.yaml`:
 
 ```yaml
 file-storage:
@@ -156,38 +156,38 @@ minio:
   bucket-name: filestorage
 ```
 
-Все значения могут быть переопределены через переменные окружения.
+All values can be overridden via environment variables.
 
-## Дополнительная документация
+## Additional Documentation
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - архитектура и дизайн-решения
-- [SECURITY.md](docs/SECURITY.md) - безопасность и контроль доступа
-- [DEPLOYMENT.md](docs/DEPLOYMENT.md) - развертывание и инфраструктура
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - architecture and design decisions
+- [SECURITY.md](docs/SECURITY.md) - security and access control
+- [DEPLOYMENT.md](docs/DEPLOYMENT.md) - deployment and infrastructure
 
-## Разработка
+## Development
 
-### Требования
+### Requirements
 
 - Java 17+
 - PostgreSQL 12+
-- MinIO (через docker-compose)
+- MinIO (via docker-compose)
 
-### Сборка
+### Build
 
 ```bash
 ./gradlew build
 ```
 
-### Запуск тестов
+### Run Tests
 
 ```bash
 ./gradlew test
 ```
 
-## Лицензия
+## License
 
-Этот проект создан для демонстрации функциональности файлового хранилища.
+This project is created to demonstrate file storage functionality.
 
 ---
 
-**Версия:** 1.0
+**Version:** 1.0

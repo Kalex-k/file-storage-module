@@ -1,99 +1,99 @@
-# Безопасность и контроль доступа
+# Security and Access Control
 
-## Ролевая модель доступа
+## Role-Based Access Model
 
-Файлы могут быть ограничены определенными ролями участников проекта:
+Files can be restricted to specific project participant roles:
 
 ```java
-// При загрузке можно указать разрешенные роли
+// Allowed roles can be specified during upload
 POST /api/v1/projects/123/resources
   ?allowedRoles=MANAGER,DEVELOPER
 
-// Если роли не указаны, доступ имеют все участники проекта
+// If roles not specified, all project participants have access
 ```
 
-### Проверка доступа при скачивании
+### Access Check on Download
 
-1. Проверка существования пользователя
-2. Проверка наличия хотя бы одной разрешенной роли
-3. Проверка статуса файла (только ACTIVE)
+1. User existence verification
+2. Check for at least one allowed role
+3. File status check (ACTIVE only)
 
-### Права на удаление
+### Deletion Rights
 
-Удалять файлы могут:
-- **Создатель файла** (`createdBy`)
-- **Менеджер проекта** (роль `MANAGER` или `OWNER`)
+Files can be deleted by:
+- **File creator** (`createdBy`)
+- **Project manager** (role `MANAGER` or `OWNER`)
 
-## Валидация файлов
+## File Validation
 
-### Размер файла
+### File Size
 
-- Максимальный размер: 500MB (настраивается через `file-storage.max-file-size`)
-- Проверка до загрузки в хранилище
-- Ошибка: `PAYLOAD_TOO_LARGE` (413)
+- Maximum size: 500MB (configurable via `file-storage.max-file-size`)
+- Check before upload to storage
+- Error: `PAYLOAD_TOO_LARGE` (413)
 
-### Расширения файлов
+### File Extensions
 
-- Блокировка: `exe`, `bat`, `cmd`, `sh`
-- Настраиваемый список через конфигурацию `file-storage.blocked-extensions`
-- Ошибка: `IllegalArgumentException` (400)
+- Blocked: `exe`, `bat`, `cmd`, `sh`
+- Configurable list via `file-storage.blocked-extensions` configuration
+- Error: `IllegalArgumentException` (400)
 
-### MIME-тип
+### MIME Type
 
-- Определение через Apache Tika (анализ содержимого)
-- Fallback на заголовок `Content-Type` от клиента
-- Дефолтный тип: `application/octet-stream`
-- Защита от подмены расширений
+- Detection via Apache Tika (content analysis)
+- Fallback to client `Content-Type` header
+- Default type: `application/octet-stream`
+- Protection against extension spoofing
 
-## Санитизация имен файлов
+## File Name Sanitization
 
-Имена файлов очищаются перед сохранением:
+File names are cleaned before saving:
 
-- Удаление специальных символов (regex: `[^a-zA-Z0-9.-]`)
-- Замена на подчеркивания
-- Приведение к нижнему регистру
-- Удаление дублирующихся подчеркиваний
+- Remove special characters (regex: `[^a-zA-Z0-9.-]`)
+- Replace with underscores
+- Convert to lowercase
+- Remove duplicate underscores
 
-**Пример:**
+**Example:**
 ```
-"Мой Документ (2024).pdf" → "мой_документ_2024_.pdf"
+"My Document (2024).pdf" → "my_document_2024_.pdf"
 ```
 
-## Генерация ключей хранилища
+## Storage Key Generation
 
-Формат ключа обеспечивает уникальность и структурированность:
+Key format ensures uniqueness and structure:
 
 ```
 project-{projectId}/{timestamp}-{uuid}-{sanitizedFileName}
 ```
 
-**Пример:**
+**Example:**
 ```
 project-123/1703123456789-a1b2c3d4-document.pdf
 ```
 
-**Преимущества:**
-- Уникальность через timestamp + UUID
-- Группировка по проектам
-- Сохранение оригинального имени (санитизированного)
+**Advantages:**
+- Uniqueness via timestamp + UUID
+- Grouping by projects
+- Original name preservation (sanitized)
 
-## Обработка ошибок безопасности
+## Security Error Handling
 
-### Иерархия исключений
+### Exception Hierarchy
 
 ```
 RuntimeException
-├── EntityNotFoundException          (404) - сущность не найдена
-├── ResourceNotFoundException        (404) - файл не найден
-├── StorageLimitExceededException    (507) - превышена квота
-├── IllegalArgumentException         (400) - невалидные параметры
-├── IllegalStateException            (400) - недопустимое состояние
-└── AccessDeniedException            (403) - нет доступа
+├── EntityNotFoundException          (404) - entity not found
+├── ResourceNotFoundException        (404) - file not found
+├── StorageLimitExceededException    (507) - quota exceeded
+├── IllegalArgumentException         (400) - invalid parameters
+├── IllegalStateException            (400) - invalid state
+└── AccessDeniedException            (403) - access denied
 ```
 
-### Стандартизированные ответы
+### Standardized Responses
 
-Все ошибки возвращаются в едином формате:
+All errors returned in unified format:
 
 ```json
 {
@@ -102,44 +102,44 @@ RuntimeException
 }
 ```
 
-## Контроль квот хранилища
+## Storage Quota Control
 
-### Механизм проверки
+### Check Mechanism
 
-1. **Pessimistic Locking** на уровне проекта
-   - Предотвращение race conditions
-   - Гарантия атомарности проверки и обновления
+1. **Pessimistic Locking** at project level
+   - Prevents race conditions
+   - Guarantees atomicity of check and update
 
-2. **Автоматический пересчет**
-   - После каждой загрузки/удаления
-   - Агрегация только активных файлов
-   - Обновление поля `storageSize` проекта
+2. **Automatic Recalculation**
+   - After each upload/delete
+   - Aggregation of active files only
+   - Update project `storageSize` field
 
-3. **Валидация перед загрузкой**
-   - Проверка текущего размера + размер нового файла
-   - Сравнение с `maxStorageSize`
-   - Ошибка: `StorageLimitExceededException` (507)
+3. **Validation Before Upload**
+   - Check current size + new file size
+   - Compare with `maxStorageSize`
+   - Error: `StorageLimitExceededException` (507)
 
-### Настройка квот
+### Quota Configuration
 
-- По умолчанию: 2GB на проект
-- Настраивается через поле `maxStorageSize` в таблице `project`
-- Можно установить индивидуально для каждого проекта
+- Default: 2GB per project
+- Configurable via `maxStorageSize` field in `project` table
+- Can be set individually for each project
 
-## Рекомендации по безопасности
+## Security Recommendations
 
-1. **Использование HTTPS** в production
-2. **Валидация всех входных данных**
-3. **Логирование операций** с файлами
-4. **Мониторинг** подозрительной активности
-5. **Регулярное обновление** зависимостей
-6. **Ограничение размера** запросов на уровне веб-сервера
-7. **Rate limiting** для API endpoints
+1. **Use HTTPS** in production
+2. **Validate all input data**
+3. **Log file operations**
+4. **Monitor** suspicious activity
+5. **Regular dependency updates**
+6. **Request size limits** at web server level
+7. **Rate limiting** for API endpoints
 
-## Будущие улучшения
+## Future Improvements
 
-- Шифрование файлов на стороне сервера
-- Интеграция с антивирусным сканированием
-- Детальное аудит-логирование
-- Двухфакторная аутентификация для критичных операций
-- Интеграция с OAuth2/JWT для production
+- Server-side file encryption
+- Antivirus scanning integration
+- Detailed audit logging
+- Two-factor authentication for critical operations
+- OAuth2/JWT integration for production

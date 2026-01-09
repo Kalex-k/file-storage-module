@@ -1,6 +1,6 @@
-# Архитектура File Storage Service
+# File Storage Service Architecture
 
-## Общая архитектура
+## General Architecture
 
 ```
 ┌─────────────────┐
@@ -20,182 +20,182 @@
 └────────┘  └──────────┘
 ```
 
-## Поток данных при загрузке файла
+## File Upload Data Flow
 
 1. Client → POST `/api/v1/projects/{id}/resources`
-2. ResourceController → валидация запроса
-3. FileStorageService → проверка прав доступа
-4. FileStorageService → проверка квоты хранилища (с pessimistic lock)
-5. FileStorageService → валидация файла (размер, расширение)
-6. FileStorageService → определение MIME-типа (Apache Tika)
-7. FileStorageService → генерация уникального ключа
-8. FileStorageService → загрузка в MinIO
-9. FileStorageService → сохранение метаданных в PostgreSQL
-10. FileStorageService → обновление размера хранилища проекта
-11. Response → ResourceResponse с метаданными файла
+2. ResourceController → request validation
+3. FileStorageService → access rights check
+4. FileStorageService → storage quota check (with pessimistic lock)
+5. FileStorageService → file validation (size, extension)
+6. FileStorageService → MIME type detection (Apache Tika)
+7. FileStorageService → unique key generation
+8. FileStorageService → upload to MinIO
+9. FileStorageService → save metadata to PostgreSQL
+10. FileStorageService → update project storage size
+11. Response → ResourceResponse with file metadata
 
-## Выбор технологий
+## Technology Selection
 
-### MinIO - Объектное хранилище
+### MinIO - Object Storage
 
-**Почему MinIO?**
+**Why MinIO?**
 
-1. **S3-совместимый API**
-   - Полная совместимость с Amazon S3 API
-   - Легкая миграция на AWS S3 в будущем
-   - Поддержка presigned URLs из коробки
+1. **S3-compatible API**
+   - Full compatibility with Amazon S3 API
+   - Easy migration to AWS S3 in the future
+   - Built-in presigned URL support
 
-2. **Простота развертывания**
-   - Легковесный контейнер
-   - Минимальные требования к ресурсам
-   - Простая конфигурация
+2. **Simple Deployment**
+   - Lightweight container
+   - Minimal resource requirements
+   - Simple configuration
 
-3. **Производительность**
-   - Высокая скорость чтения/записи
-   - Оптимизация для больших файлов
-   - Поддержка multipart upload
+3. **Performance**
+   - High read/write speed
+   - Optimized for large files
+   - Multipart upload support
 
-4. **Self-hosted решение**
-   - Полный контроль над данными
-   - Отсутствие зависимости от внешних сервисов
-   - Снижение затрат на хранение
+4. **Self-hosted Solution**
+   - Full control over data
+   - No dependency on external services
+   - Reduced storage costs
 
-**Альтернативы, которые были рассмотрены:**
-- **AWS S3** - отложено из-за необходимости внешней зависимости и затрат
-- **Local File System** - не подходит для масштабирования и распределенных систем
-- **HDFS** - избыточно для текущих требований
+**Alternatives Considered:**
+- **AWS S3** - deferred due to external dependency and costs
+- **Local File System** - not suitable for scaling and distributed systems
+- **HDFS** - excessive for current requirements
 
-### Apache Tika - Определение MIME-типов
+### Apache Tika - MIME Type Detection
 
-**Почему Apache Tika?**
+**Why Apache Tika?**
 
-1. **Точность определения**
-   - Анализ содержимого файла, а не только расширения
-   - Поддержка 1000+ форматов файлов
-   - Защита от подмены расширений
+1. **Detection Accuracy**
+   - Content analysis, not just extension
+   - Support for 1000+ file formats
+   - Protection against extension spoofing
 
-2. **Надежность**
-   - Проверенный временем проект Apache
-   - Активная поддержка сообщества
-   - Регулярные обновления
+2. **Reliability**
+   - Time-tested Apache project
+   - Active community support
+   - Regular updates
 
-3. **Производительность**
-   - Легковесная библиотека
-   - Кэширование результатов
-   - Минимальное влияние на производительность
+3. **Performance**
+   - Lightweight library
+   - Result caching
+   - Minimal performance impact
 
-**Альтернативы:**
-- **Определение по расширению** - небезопасно, легко обмануть
-- **Определение по HTTP заголовкам** - ненадежно, клиент может подделать
+**Alternatives:**
+- **Extension-based detection** - insecure, easily spoofed
+- **HTTP header detection** - unreliable, client can forge
 
-### PostgreSQL - Хранение метаданных
+### PostgreSQL - Metadata Storage
 
-**Почему PostgreSQL?**
+**Why PostgreSQL?**
 
-1. **ACID гарантии**
-   - Транзакционность операций
-   - Консистентность данных
-   - Надежность при конкурентном доступе
+1. **ACID Guarantees**
+   - Transactional operations
+   - Data consistency
+   - Reliability under concurrent access
 
-2. **Производительность**
-   - Эффективные индексы для поиска
-   - Оптимизированные запросы для агрегации
-   - Поддержка блокировок
+2. **Performance**
+   - Efficient indexes for search
+   - Optimized queries for aggregation
+   - Lock support
 
-3. **Уже используется в проекте**
-   - Единая инфраструктура БД
-   - Простота интеграции
-   - Снижение сложности системы
+3. **Already Used in Project**
+   - Unified database infrastructure
+   - Simple integration
+   - Reduced system complexity
 
-### PESSIMISTIC Locking для Project
+### PESSIMISTIC Locking for Project
 
-**Почему PESSIMISTIC_WRITE, а не OPTIMISTIC?**
+**Why PESSIMISTIC_WRITE instead of OPTIMISTIC?**
 
-**При использовании OPTIMISTIC_LOCK:**
-- При возникновении OptimisticLockException файл уже загружен в MinIO
-- Требуется дополнительная логика отката (rollback) загрузки в MinIO
-- Риск "висящих" файлов в хранилище при ошибках
+**With OPTIMISTIC_LOCK:**
+- When OptimisticLockException occurs, file is already uploaded to MinIO
+- Additional rollback logic required for MinIO upload
+- Risk of "orphaned" files in storage on errors
 
-**При использовании PESSIMISTIC_WRITE:**
-- Блокировка записи происходит сразу при чтении
-- Гарантируется атомарность операции проверки квоты и обновления
-- Исключается race condition при параллельных загрузках
-- Файл загружается в MinIO только после успешной проверки квоты
+**With PESSIMISTIC_WRITE:**
+- Write lock occurs immediately on read
+- Atomicity of quota check and update guaranteed
+- Race condition eliminated during parallel uploads
+- File uploaded to MinIO only after successful quota check
 
-**Компромисс:**
-- Небольшое снижение пропускной способности при высокой конкурентности
-- Значительное повышение надежности и консистентности данных
+**Trade-off:**
+- Slight throughput reduction under high concurrency
+- Significant improvement in reliability and data consistency
 
-## Основные компоненты
+## Main Components
 
 ### ResourceController
 
-REST контроллер, предоставляющий API для работы с файлами проекта.
+REST controller providing API for project file operations.
 
-**Основные методы:**
-- `POST /api/v1/projects/{projectId}/resources` - загрузка файла
-- `GET /api/v1/projects/{projectId}/resources/{resourceId}/download` - скачивание файла
-- `GET /api/v1/projects/{projectId}/resources/{resourceId}/url` - получение presigned URL
-- `DELETE /api/v1/projects/{projectId}/resources/{resourceId}` - удаление файла
-- `GET /api/v1/projects/{projectId}/resources` - список файлов проекта (с пагинацией)
-- `POST /api/v1/projects/{projectId}/resources/bulk` - массовая загрузка файлов
+**Main Methods:**
+- `POST /api/v1/projects/{projectId}/resources` - upload file
+- `GET /api/v1/projects/{projectId}/resources/{resourceId}/download` - download file
+- `GET /api/v1/projects/{projectId}/resources/{resourceId}/url` - get presigned URL
+- `DELETE /api/v1/projects/{projectId}/resources/{resourceId}` - delete file
+- `GET /api/v1/projects/{projectId}/resources` - project file list (with pagination)
+- `POST /api/v1/projects/{projectId}/resources/bulk` - bulk file upload
 
 ### FileStorageService
 
-Центральный сервис, реализующий бизнес-логику работы с файлами.
+Central service implementing file operation business logic.
 
-**Ключевые функции:**
+**Key Functions:**
 
-1. **Валидация файлов**
-   - Проверка размера (max 500MB по умолчанию)
-   - Проверка расширения (блокировка exe, bat, cmd, sh)
-   - Определение MIME-типа через Apache Tika
+1. **File Validation**
+   - Size check (max 500MB by default)
+   - Extension check (block exe, bat, cmd, sh)
+   - MIME type detection via Apache Tika
 
-2. **Управление квотами**
-   - Проверка текущего размера хранилища проекта
-   - Валидация перед загрузкой (с pessimistic lock)
-   - Автоматическое обновление после операций
+2. **Quota Management**
+   - Check current project storage size
+   - Validation before upload (with pessimistic lock)
+   - Automatic update after operations
 
-3. **Контроль доступа**
-   - Проверка ролей пользователя
-   - Валидация прав на чтение/удаление
-   - Поддержка ролевой модели доступа
+3. **Access Control**
+   - User role verification
+   - Read/delete permission validation
+   - Role-based access model support
 
-4. **Генерация ключей хранилища**
+4. **Storage Key Generation**
    ```
-   Формат: project-{projectId}/{timestamp}-{uuid}-{sanitizedFileName}
-   Пример: project-123/1703123456789-a1b2c3d4-document.pdf
+   Format: project-{projectId}/{timestamp}-{uuid}-{sanitizedFileName}
+   Example: project-123/1703123456789-a1b2c3d4-document.pdf
    ```
 
 ### MinioConfig
 
-Конфигурация клиента MinIO с автоматическим созданием bucket при старте приложения.
+MinIO client configuration with automatic bucket creation on application startup.
 
-**Особенности:**
-- Условная активация через `@ConditionalOnProperty`
-- Обработка ошибок подключения в тестовом окружении
-- Автоматическое создание bucket при отсутствии
+**Features:**
+- Conditional activation via `@ConditionalOnProperty`
+- Connection error handling in test environment
+- Automatic bucket creation if missing
 
-## Модели данных
+## Data Models
 
 ### Resource
 
-Основная сущность, представляющая файл в системе.
+Main entity representing a file in the system.
 
-**Поля:**
-- `id: Long` - уникальный идентификатор
-- `name: String` - оригинальное имя файла
-- `key: String` - ключ в объектном хранилище
-- `contentType: String` - MIME-тип файла
-- `size: BigInteger` - размер файла в байтах
-- `type: ResourceType` - категория файла
-- `status: ResourceStatus` - статус (ACTIVE, DELETED)
-- `allowedRoles: List<UserRole>` - роли с доступом к файлу
-- `project: Project` - связь с проектом
-- `createdBy/updatedBy: User` - автор и последний редактор
+**Fields:**
+- `id: Long` - unique identifier
+- `name: String` - original file name
+- `key: String` - object storage key
+- `contentType: String` - file MIME type
+- `size: BigInteger` - file size in bytes
+- `type: ResourceType` - file category
+- `status: ResourceStatus` - status (ACTIVE, DELETED)
+- `allowedRoles: List<UserRole>` - roles with file access
+- `project: Project` - project relationship
+- `createdBy/updatedBy: User` - author and last editor
 
-**Определение типа ресурса:**
-Тип определяется автоматически на основе MIME-типа файла:
+**Resource Type Detection:**
+Type is automatically determined based on file MIME type:
 - `image/*` → IMAGE
 - `video/*` → VIDEO
 - `audio/*` → AUDIO
@@ -204,61 +204,61 @@ REST контроллер, предоставляющий API для работ�
 - `application/vnd.ms-excel` → MSEXCEL
 - `application/zip` → ZIP
 - `text/*` → TEXT
-- Неизвестный тип → OTHER или NONE
+- Unknown type → OTHER or NONE
 
-### Project (расширение)
+### Project (Extension)
 
-Добавлены поля для управления хранилищем:
+Added fields for storage management:
 
-- `storageSize: BigInteger` - текущий размер хранилища
-- `maxStorageSize: BigInteger` - максимальный размер (по умолчанию 2GB)
+- `storageSize: BigInteger` - current storage size
+- `maxStorageSize: BigInteger` - maximum size (default 2GB)
 
-## Производительность
+## Performance
 
-### Оптимизации
+### Optimizations
 
-1. **Streaming загрузка/скачивание**
-   - Файлы не загружаются полностью в память
-   - Использование StreamingResponseBody для скачивания
-   - Потоковая передача в MinIO
+1. **Streaming Upload/Download**
+   - Files not fully loaded into memory
+   - Using StreamingResponseBody for download
+   - Streaming transfer to MinIO
 
-2. **Индексы БД**
-   - Оптимизированные запросы для поиска файлов
-   - Быстрая агрегация размера хранилища
+2. **Database Indexes**
+   - Optimized queries for file search
+   - Fast storage size aggregation
 
 3. **Pessimistic Locking**
-   - Минимальное время блокировки
-   - Блокировка только на время проверки квоты
+   - Minimal lock duration
+   - Lock only during quota check
 
-### Рекомендации
+### Recommendations
 
-- Использовать connection pooling для MinIO
-- Настроить кэширование метаданных файлов (если требуется)
-- Рассмотреть CDN для часто запрашиваемых файлов
-- Мониторить размер bucket и настраивать lifecycle policies
+- Use connection pooling for MinIO
+- Configure metadata caching (if needed)
+- Consider CDN for frequently requested files
+- Monitor bucket size and configure lifecycle policies
 
-## Будущие улучшения
+## Future Improvements
 
-### Потенциальные расширения
+### Potential Extensions
 
-1. **Версионирование файлов**
-   - Сохранение истории изменений
-   - Возможность отката к предыдущей версии
+1. **File Versioning**
+   - Change history preservation
+   - Rollback to previous version capability
 
-2. **Шифрование**
-   - Шифрование файлов на стороне сервера
-   - Поддержка client-side encryption
+2. **Encryption**
+   - Server-side file encryption
+   - Client-side encryption support
 
-3. **CDN интеграция**
-   - Кэширование популярных файлов
-   - Географическое распределение
+3. **CDN Integration**
+   - Popular file caching
+   - Geographic distribution
 
-4. **Асинхронная обработка**
-   - Очереди для больших файлов
-   - Фоновое сканирование на вирусы
-   - Автоматическая генерация превью
+4. **Asynchronous Processing**
+   - Queues for large files
+   - Background virus scanning
+   - Automatic thumbnail generation
 
-5. **Расширенная аналитика**
-   - Статистика использования хранилища
-   - Отчеты по типам файлов
-   - Мониторинг доступа
+5. **Advanced Analytics**
+   - Storage usage statistics
+   - File type reports
+   - Access monitoring

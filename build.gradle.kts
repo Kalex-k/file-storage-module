@@ -71,7 +71,7 @@ dependencies {
     implementation("io.minio:minio:8.5.7")
 
     /** ------------------------------
-     * Apache Tika (определение MIME типов)
+     * Apache Tika (MIME type detection)
      * ------------------------------ */
     implementation("org.apache.tika:tika-core:2.9.1")
 }

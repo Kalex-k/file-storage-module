@@ -1,42 +1,42 @@
-# Развертывание
+# Deployment
 
-## Требования
+## Requirements
 
 - Java 17+
 - PostgreSQL 12+
-- MinIO Server (или совместимое S3 хранилище)
+- MinIO Server (or compatible S3 storage)
 - Spring Boot 3.x
 
 ## Docker Compose
 
-### Вариант 1: Только зависимости
+### Option 1: Dependencies Only
 
-Запуск PostgreSQL и MinIO для локальной разработки:
+Start PostgreSQL and MinIO for local development:
 
 ```bash
 docker-compose up -d
 ```
 
-**Сервисы:**
+**Services:**
 - PostgreSQL: `localhost:5432`
 - MinIO API: `http://localhost:9000`
 - MinIO Console: `http://localhost:9001`
 
-### Вариант 2: Полный стек
+### Option 2: Full Stack
 
-Запуск всего приложения в Docker:
+Run entire application in Docker:
 
 ```bash
 docker-compose -f docker-compose.full.yml up -d
 ```
 
-**Сервисы:**
+**Services:**
 - PostgreSQL: `localhost:5432`
 - MinIO API: `http://localhost:9000`
 - MinIO Console: `http://localhost:9001`
 - Application: `http://localhost:8080`
 
-## Запуск MinIO
+## Starting MinIO
 
 ### Docker Compose
 
@@ -61,27 +61,27 @@ docker run -p 9000:9000 -p 9001:9001 \
   minio/minio server /data --console-address ":9001"
 ```
 
-## Инициализация bucket
+## Bucket Initialization
 
-Bucket создается автоматически при первом запуске приложения через `MinioConfig`.
+Bucket is created automatically on first application startup via `MinioConfig`.
 
-**Проверка:**
-1. Откройте MinIO Console: `http://localhost:9001`
-2. Войдите с учетными данными: `minioadmin` / `minioadmin`
-3. Убедитесь, что bucket `filestorage` создан
+**Verification:**
+1. Open MinIO Console: `http://localhost:9001`
+2. Login with credentials: `minioadmin` / `minioadmin`
+3. Verify that `filestorage` bucket is created
 
-## Миграции базы данных
+## Database Migrations
 
-Миграции выполняются автоматически через Liquibase при старте приложения.
+Migrations are executed automatically via Liquibase on application startup.
 
-**Проверка:**
+**Verification:**
 ```sql
 SELECT * FROM databasechangelog ORDER BY dateexecuted DESC;
 ```
 
-## Конфигурация
+## Configuration
 
-### Переменные окружения
+### Environment Variables
 
 ```bash
 # Database
@@ -102,7 +102,7 @@ export FILE_STORAGE_BLOCKED_EXTENSIONS=exe,bat,cmd,sh
 
 ### application.yaml
 
-Основные настройки:
+Main settings:
 
 ```yaml
 spring:
@@ -122,93 +122,93 @@ file-storage:
   blocked-extensions: ${FILE_STORAGE_BLOCKED_EXTENSIONS:exe,bat,cmd,sh}
 ```
 
-## Сборка и запуск
+## Build and Run
 
-### Локальная разработка
+### Local Development
 
 ```bash
-# Сборка
+# Build
 ./gradlew build
 
-# Запуск
+# Run
 ./gradlew bootRun
 ```
 
 ### Production
 
 ```bash
-# Сборка JAR
+# Build JAR
 ./gradlew bootJar
 
-# Запуск
+# Run
 java -jar build/libs/filestorage-service.jar
 ```
 
 ### Docker
 
 ```bash
-# Сборка образа
+# Build image
 docker build -t filestorage-service .
 
-# Запуск
+# Run
 docker run -p 8080:8080 \
   -e SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/filestorage \
   -e MINIO_ENDPOINT=http://minio:9000 \
   filestorage-service
 ```
 
-## Мониторинг
+## Monitoring
 
 ### Health Checks
 
 ```bash
-# Проверка здоровья приложения
+# Check application health
 curl http://localhost:8080/actuator/health
 ```
 
-### Метрики
+### Metrics
 
 ```bash
-# Просмотр метрик
+# View metrics
 curl http://localhost:8080/actuator/metrics
 ```
 
-### Рекомендуемый мониторинг
+### Recommended Monitoring
 
-- Размер хранилища проектов
-- Количество загруженных файлов
-- Ошибки загрузки/скачивания
-- Использование квот
-- Время отклика API
+- Project storage sizes
+- Number of uploaded files
+- Upload/download errors
+- Quota usage
+- API response time
 
-## Рекомендации для production окружения
+## Recommendations for Production Environment
 
-1. Использовать HTTPS для всех соединений
-2. Настроить connection pooling для PostgreSQL и MinIO
-3. Использовать secrets management для паролей и ключей
-4. Настроить логирование в централизованную систему
-5. Настроить мониторинг и алертинг
-6. Регулярные бэкапы базы данных и MinIO
-7. Настроить lifecycle policies для MinIO (удаление старых файлов)
-8. Использовать CDN для часто запрашиваемых файлов
+1. Use HTTPS for all connections
+2. Configure connection pooling for PostgreSQL and MinIO
+3. Use secrets management for passwords and keys
+4. Configure logging to centralized system
+5. Configure monitoring and alerting
+6. Regular backups of database and MinIO
+7. Configure lifecycle policies for MinIO (old file deletion)
+8. Use CDN for frequently requested files
 
 ## Troubleshooting
 
-### MinIO не подключается
+### MinIO Connection Issues
 
-1. Проверьте, что MinIO запущен: `docker ps`
-2. Проверьте endpoint в конфигурации
-3. Проверьте credentials
-4. Проверьте сеть между контейнерами
+1. Check that MinIO is running: `docker ps`
+2. Check endpoint in configuration
+3. Check credentials
+4. Check network between containers
 
-### Миграции не выполняются
+### Migrations Not Executing
 
-1. Проверьте подключение к БД
-2. Проверьте логи приложения
-3. Проверьте таблицу `databasechangelog`
+1. Check database connection
+2. Check application logs
+3. Check `databasechangelog` table
 
-### Превышение квоты
+### Quota Exceeded
 
-1. Проверьте `max_storage_size` в таблице `project`
-2. Проверьте текущий `storage_size`
-3. Удалите неиспользуемые файлы
+1. Check `max_storage_size` in `project` table
+2. Check current `storage_size`
+3. Delete unused files
