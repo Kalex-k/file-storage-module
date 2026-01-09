@@ -1,0 +1,39 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+  liquibase:
+    enabled: false
+
+minio:
+  enabled: false
+  endpoint: http://localhost:9000
+  access-key: test
+  secret-key: test
+  bucket-name: test-bucket
+  region: us-east-1
+
+file-storage:
+  max-file-size: 500000000
+  blocked-extensions: exe,bat,cmd,sh
+  presigned-url-expiry-seconds: 3600
+  uuid-substring-length: 8
+  default-content-type: application/octet-stream
+  bulk-upload-max-files: 10
+
+logging:
+  level:
+    root: WARN
+    com.filestorage: INFO

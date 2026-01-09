@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: file-storage-service
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/filestorage
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 500MB
+      max-request-size: 500MB
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    root: info
+    io.minio: INFO
+    com.filestorage: INFO
+
+# MinIO Configuration
+minio:
+  enabled: true
+  endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  bucket-name: ${MINIO_BUCKET:filestorage}
+  region: ${MINIO_REGION:us-east-1}
+
+# File Storage Configuration
+file-storage:
+  max-file-size: 500000000  # 500MB in bytes
+  blocked-extensions: exe,bat,cmd,sh
+  presigned-url-expiry-seconds: 3600
+  uuid-substring-length: 8
+  default-content-type: application/octet-stream
+  bulk-upload-max-files: 10
